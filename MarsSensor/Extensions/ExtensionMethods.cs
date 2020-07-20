@@ -11,22 +11,6 @@ namespace MarsSensor.Extensions
 {
 	internal static class ExtensionMethods
 	{
-		internal static string ToXml(this object obj)
-		{
-			var serializer = new XmlSerializer(obj.GetType());
-			var writer = new StringWriter();
-			serializer.Serialize(writer, obj);
-
-			return writer.ToString();
-		}
-
-		internal static T FromXml<T>(this T obj, string xml) where T : class
-		{
-			XmlSerializer serializer = new XmlSerializer(typeof(T));
-			StringReader reader = new StringReader(xml);
-			return (T) serializer.Deserialize(reader);
-		}
-
 		internal static T Copy<T>(this T source) where T : class
 		{
 			if (source == null)
@@ -81,9 +65,9 @@ namespace MarsSensor.Extensions
 			return destination;
 		}
 
-		public static T CastTo<T>(this object o) => (T)o;
+		private static T CastTo<T>(this object o) => (T)o;
 
-		public static dynamic CastToReflected(this object o, Type type)
+		private static dynamic CastToReflected(this object o, Type type)
 		{
 			var methodInfo = typeof(ExtensionMethods).GetMethod(nameof(CastTo), BindingFlags.Static | BindingFlags.Public);
 			var genericArguments = new[] { type };

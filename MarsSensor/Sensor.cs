@@ -94,7 +94,7 @@ namespace MarsSensor
 		public string ServerAddress { get; private set; }
 
 		/// <summary>
-		/// Gets or sets weather the sensor will Send invalid messages
+		/// Gets or sets whether the sensor will Send invalid messages
 		/// </summary>
 		public bool ValidateMessages { get; set; } = true;
 
@@ -107,6 +107,11 @@ namespace MarsSensor
 		/// Gets or Sets the Current Full Status Report
 		/// </summary>
 		public DeviceStatusReport StatusReport { get; set; }
+
+		/// <summary>
+		/// Gets or Sets whether to send status reports regardless to keep alive requests or not
+		/// </summary>
+		public bool AutoStatusReport { get; set; }
 
 		#endregion
 
@@ -795,6 +800,11 @@ namespace MarsSensor
 					}
 				}
 			}
+
+			if (AutoStatusReport)
+			{
+				SendEmptyDeviceStatusReport();
+			}
 		}
 
 		private void SendSingleIndicationReport(DeviceIndicationReport report, string marsName)
@@ -1033,7 +1043,7 @@ namespace MarsSensor
 	/// <param name="messageType">Message type</param>
 	/// <param name="message">the message object</param>
 	/// <param name="marsName">Name of the mars client associated with the event</param>
-	public delegate void MarsMessageEventHandler(MarsMessageTypes messageType, object message, string marsName);
+	public delegate void MarsMessageEventHandler(MarsMessageTypes messageType, MrsMessage message, string marsName);
 	/// <summary>
 	/// Event handler for mars validation errors
 	/// </summary>

@@ -5,7 +5,7 @@
     <DeviceType>EO Device</DeviceType>
     <DeviceCategory>Undefined</DeviceCategory>
   </DeviceIdentification>
-  <NotificationServiceIPAddress xmlns="urn:SNSR_STD">192.168.43.105</NotificationServiceIPAddress>
+  <NotificationServiceIPAddress xmlns="urn:SNSR_STD">192.168.2.106</NotificationServiceIPAddress>
   <NotificationServicePort xmlns="urn:SNSR_STD">13001</NotificationServicePort>
   <LocationType xmlns="urn:SNSR_STD">
     <GeodeticLocation Datum="WGS84">

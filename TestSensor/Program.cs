@@ -25,45 +25,63 @@ namespace TestSensor
 			sensor.MessageSent += Sensor_MessageSent;
 			sensor.ValidationErrorOccured += Sensor_ValidationErrorOccured;
 
-			var serializer = new XmlSerializer(typeof(DeviceConfiguration));
+			var serializer = new XmlSerializer(typeof(DeviceConfiguration), new XmlRootAttribute(nameof(DeviceConfiguration)));
 			var deviceConfiguration =
 				(DeviceConfiguration) serializer.Deserialize(new StringReader(Resources.DeviceConfiguration));
 
-			serializer = new XmlSerializer(typeof(DeviceStatusReport));
+			serializer = new XmlSerializer(typeof(DeviceStatusReport), new XmlRootAttribute(nameof(DeviceStatusReport)));
 			var statusReport = (DeviceStatusReport) serializer.Deserialize(new StringReader(Resources.Status));
 
+			//FileInfo fileInfo;
+			//ItemChoiceType3 fileType;
+
+			//while (true)
+			//{
+			//	Console.WriteLine("Video or image? (v/i)");
+			//	var key =  Console.ReadLine();
+			//	if (key?.ToLower() == "i")
+			//	{
+			//		fileInfo = new FileInfo(@"D:\Development\קוד סימולטור\חדש\17977960.jpg");
+			//		fileType = ItemChoiceType3.NameJPEG;
+			//		if (fileInfo.Exists)
+			//		{
+			//			Console.WriteLine("Image loaded successfuly");
+			//		}
+			//		break;
+			//	}
+			//	if (key?.ToLower() == "v")
+			//	{
+			//		fileInfo = new FileInfo(@"D:\Development\קוד סימולטור\חדש\486360.mp4");
+			//		fileType = ItemChoiceType3.NameMP4;
+			//		if (fileInfo.Exists)
+			//		{
+			//			Console.WriteLine("Video loaded successfuly");
+			//		}
+			//		break;
+			//	}
+
+			//	Console.WriteLine("Invalid input, try again.");
+			//}
+
+			//var pictureStatus = CreatePictureStatus(fileInfo, fileType);
 
 			Console.WriteLine("Opening sensor web service...");
 			sensor.OpenWebService(deviceConfiguration, statusReport);
 			Console.WriteLine("Sensor web service opened on " + sensor.ServerAddress);
 			Console.WriteLine("Press Esc to Exit");
 
-
-			var fileInfo = new FileInfo(@"D:\Development\קוד סימולטור\חדש\17977960.jpg");
-
-			var pictureStatus = CreatePictureStatus(fileInfo);
-
-			var opticalStatus = statusReport.Items.OfType<SensorStatusReport>()
-				.FirstOrDefault(x => x.Item is OpticalStatus);
-			if (opticalStatus != null)
-			{
-				if (pictureStatus.IsValid(out var error))
-				{
-					opticalStatus.PictureStatus = pictureStatus;
-				}
-				else
-				{
-					Console.ForegroundColor = ConsoleColor.Red;
-					Console.WriteLine("Invalid Picture Status:\n" + error.Message);
-					Console.ResetColor();
-				}
-			}
-			else
-			{
-				Console.ForegroundColor = ConsoleColor.Red;
-				Console.WriteLine("No optical status found");
-				Console.ResetColor();
-			}
+			//var opticalStatus = statusReport.Items.OfType<SensorStatusReport>()
+			//	.FirstOrDefault(x => x.Item is OpticalStatus);
+			//if (opticalStatus != null)
+			//{
+			//	opticalStatus.PictureStatus = pictureStatus;
+			//}
+			//else
+			//{
+			//	Console.ForegroundColor = ConsoleColor.Red;
+			//	Console.WriteLine("No optical status found");
+			//	Console.ResetColor();
+			//}
 
 			while (Console.ReadKey(true).Key != ConsoleKey.Escape)
 			{
@@ -107,7 +125,7 @@ namespace TestSensor
 			return string.Empty;
 		}
 
-		private static PictureStatus CreatePictureStatus(FileInfo fileInfo)
+		private static PictureStatus CreatePictureStatus(FileInfo fileInfo, ItemChoiceType3 fileType)
 		{
 			return new PictureStatus
 			{
@@ -121,7 +139,7 @@ namespace TestSensor
 							Zone = TimezoneType.GMT,
 							Value = fileInfo.CreationTime
 						},
-						ItemElementName = ItemChoiceType3.NameJPEG,
+						ItemElementName = fileType,
 						Item = fileInfo.Name,
 						File1 = File.ReadAllBytes(fileInfo.FullName)
 					}
