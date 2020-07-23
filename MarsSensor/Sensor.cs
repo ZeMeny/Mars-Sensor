@@ -239,11 +239,11 @@ namespace MarsSensor
 				if (!ValidateMessages || DeviceConfiguration.IsValid(out var exception))
 				{
 					_marsClients[clientName].SoapClient.BegindoDeviceConfiguration(DeviceConfiguration, null, null);
-					MessageSent?.Invoke(MarsMessageTypes.DeviceConfiguration, DeviceConfiguration, clientName);
+					MessageSent?.Invoke(DeviceConfiguration, clientName);
 				}
 				else
 				{
-					ValidationErrorOccured?.Invoke(new InvalidMessageException(MarsMessageTypes.DeviceConfiguration, DeviceConfiguration, exception.Message));
+					ValidationErrorOccured?.Invoke(this, new InvalidMessageException(DeviceConfiguration, exception));
 				}
 			}
 		}
@@ -270,11 +270,11 @@ namespace MarsSensor
 				if (!ValidateMessages || StatusReport.IsValid(out var exception))
 				{
 					_marsClients[clientName].SoapClient.BegindoDeviceStatusReport(StatusReport, null, null);
-					MessageSent?.BeginInvoke(MarsMessageTypes.DeviceStatusReport, StatusReport, clientName, null, null);
+					MessageSent?.BeginInvoke(StatusReport, clientName, null, null);
 				}
 				else
 				{
-					ValidationErrorOccured?.Invoke(new InvalidMessageException(MarsMessageTypes.DeviceStatusReport, StatusReport, exception.Message));
+					ValidationErrorOccured?.Invoke(this, new InvalidMessageException(StatusReport, exception));
 				}
 			}
 		}
@@ -302,11 +302,11 @@ namespace MarsSensor
 				if (!ValidateMessages || emptyStatus.IsValid(out var exception))
 				{
 					_marsClients[clientName].SoapClient.BegindoDeviceStatusReport(emptyStatus, null, null);
-					MessageSent?.BeginInvoke(MarsMessageTypes.DeviceStatusReport, emptyStatus, clientName, null, null);
+					MessageSent?.BeginInvoke(emptyStatus, clientName, null, null);
 				}
 				else
 				{
-					ValidationErrorOccured?.Invoke(new InvalidMessageException(MarsMessageTypes.DeviceStatusReport, emptyStatus, exception.Message));
+					ValidationErrorOccured?.Invoke(this, new InvalidMessageException(emptyStatus, exception));
 				}
 			}
 		}
@@ -335,11 +335,11 @@ namespace MarsSensor
 				if (!ValidateMessages || emptyStatus.IsValid(out var exception))
 				{
 					_marsClients[clientName].SoapClient.BegindoDeviceStatusReport(emptyStatus, null, null);
-					MessageSent?.BeginInvoke(MarsMessageTypes.DeviceStatusReport, statusReport, clientName, null, null);
+					MessageSent?.BeginInvoke(statusReport, clientName, null, null);
 				}
 				else
 				{
-					ValidationErrorOccured?.Invoke(new InvalidMessageException(MarsMessageTypes.DeviceStatusReport, emptyStatus, exception.Message));
+					ValidationErrorOccured?.Invoke(this, new InvalidMessageException(emptyStatus, exception));
 				}
 			}
 		}
@@ -596,38 +596,6 @@ namespace MarsSensor
 			}
 		}
 
-		/// <summary>
-		/// Send indication report from a specific sensor to every mars client subscribed
-		/// </summary>
-		/// <param name="detectionTypeName">detection type</param>
-		/// <param name="sensorName">configured sensor name</param>
-		/// <param name="detections">Report's content</param>
-		public void SendIndicationReport(string detectionTypeName, string sensorName, params IndicationType[] detections)
-		{
-			if (detections.Length > 0)
-			{
-				foreach (var mars in _marsClients)
-				{
-					if (mars.Value.SubscriptionTypes != null)
-					{
-						if (mars.Value.SubscriptionTypes.Contains(SubscriptionTypeType.OperationalIndication))
-						{
-							if (detections.Length > 400)
-							{
-								detections = detections.Take(400).ToArray();
-							}
-							DeviceIndicationReport indicationReport = CreateIndicationReport(detections, sensorName, detectionTypeName);
-							if (indicationReport != null)
-							{
-								SendSingleIndicationReport(indicationReport, mars.Key);
-							}
-						}
-					}
-				}
-				_lastDetectionReceived = detections.Last();
-			}
-		}
-
 		#endregion
 
 
@@ -679,8 +647,7 @@ namespace MarsSensor
 				soapClient.Open();
 			}
 
-			MessageReceived?.BeginInvoke(MarsMessageTypes.DeviceConfiguration, request,
-				request.RequestorIdentification, null, null);
+			MessageReceived?.BeginInvoke(request, request.RequestorIdentification, null, null);
 
 			// send device config
 			SendDeviceConfig(marsName);
@@ -717,8 +684,7 @@ namespace MarsSensor
 				}
 
 				// raise the event
-				MessageReceived?.BeginInvoke(MarsMessageTypes.DeviceSubscription, request, name, 
-					null, null);
+				MessageReceived?.BeginInvoke(request, name, null, null);
 
 				// send full status report for the first time
 				SendFullDeviceStatusReport(name);
@@ -744,8 +710,7 @@ namespace MarsSensor
 				_marsClients[deviceName].LastConnectionTime = DateTime.Now;
 
 				// raise the event
-				MessageReceived?.BeginInvoke(MarsMessageTypes.CommandMessage, request, deviceName,
-					null, null);
+				MessageReceived?.BeginInvoke(request, deviceName, null, null);
 
 				// answer with empty status report
 				SendEmptyDeviceStatusReport(deviceName);
@@ -814,11 +779,11 @@ namespace MarsSensor
 				if (!ValidateMessages || report.IsValid(out var exception))
 				{
 					_marsClients[marsName].SoapClient.BegindoDeviceIndicationReport(report, null, null);
-					MessageSent?.BeginInvoke(MarsMessageTypes.DeviceIndicationReport, report, marsName, null, null);
+					MessageSent?.BeginInvoke(report, marsName, null, null);
 				}
 				else
 				{
-					ValidationErrorOccured?.Invoke(new InvalidMessageException(MarsMessageTypes.DeviceIndicationReport, report, exception.Message));
+					ValidationErrorOccured?.Invoke(this, new InvalidMessageException(report, exception));
 				}                
 			}
 		}
@@ -835,7 +800,7 @@ namespace MarsSensor
 				Math.Cos(p1) * Math.Sin(p2) - Math.Sin(p1) * Math.Cos(p2) * Math.Cos(dl));
 		}
 
-		private DeviceIndicationReport CreateIndicationReport(IndicationType[] detections, string sensorName = null, string detectionTypeName = null)
+		private DeviceIndicationReport CreateIndicationReport(IndicationType[] detections, string sensorName = null)
 		{
 			List<IndicationType> indications = new List<IndicationType>();
 
@@ -1017,7 +982,7 @@ namespace MarsSensor
 		/// <summary>
 		/// Occurs after an attempt to send an invalid mars message
 		/// </summary>
-		public event ValidationErrorEventHandler ValidationErrorOccured;
+		public event EventHandler<InvalidMessageException> ValidationErrorOccured;
 
 
 		#endregion
@@ -1040,13 +1005,7 @@ namespace MarsSensor
 	/// <summary>
 	/// Event Handler for any mars message events
 	/// </summary>
-	/// <param name="messageType">Message type</param>
 	/// <param name="message">the message object</param>
 	/// <param name="marsName">Name of the mars client associated with the event</param>
-	public delegate void MarsMessageEventHandler(MarsMessageTypes messageType, MrsMessage message, string marsName);
-	/// <summary>
-	/// Event handler for mars validation errors
-	/// </summary>
-	/// <param name="messageException">contains details of the validation error</param>
-	public delegate void ValidationErrorEventHandler(InvalidMessageException messageException);
+	public delegate void MarsMessageEventHandler(MrsMessage message, string marsName);
 }

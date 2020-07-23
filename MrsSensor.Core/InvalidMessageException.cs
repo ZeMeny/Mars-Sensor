@@ -1,11 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using SensorStandard;
 
-namespace MarsSensor
+namespace MrsSensor.Core
 {
     /// <summary>
     /// An Exception related to mars messages validation

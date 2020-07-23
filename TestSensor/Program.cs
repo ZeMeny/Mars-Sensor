@@ -45,7 +45,7 @@ namespace TestSensor
 			//		fileType = ItemChoiceType3.NameJPEG;
 			//		if (fileInfo.Exists)
 			//		{
-			//			Console.WriteLine("Image loaded successfuly");
+			//			Console.WriteLine("Image loaded successfully");
 			//		}
 			//		break;
 			//	}
@@ -55,7 +55,7 @@ namespace TestSensor
 			//		fileType = ItemChoiceType3.NameMP4;
 			//		if (fileInfo.Exists)
 			//		{
-			//			Console.WriteLine("Video loaded successfuly");
+			//			Console.WriteLine("Video loaded successfully");
 			//		}
 			//		break;
 			//	}
@@ -94,21 +94,29 @@ namespace TestSensor
 			Console.WriteLine("Web service closed");
 		}
 
-		private static void Sensor_ValidationErrorOccured(InvalidMessageException messageException)
+		private static void Sensor_ValidationErrorOccured(object sender, InvalidMessageException messageException)
 		{
 			Console.ForegroundColor = ConsoleColor.Red;
 			Console.WriteLine("Vaildation Error!\n" + messageException.Message);
 			Console.ResetColor();
 		}
 
-		private static void Sensor_MessageSent(MarsMessageTypes messageType, object message, string marsName)
+		private static void Sensor_MessageSent(MrsMessage message, string marsName)
 		{
-			Console.WriteLine($"{messageType.ToString()} message sent to {marsName}");
+			Console.WriteLine($"{message.MrsMessageType} message sent to {marsName}");
 		}
 
-		private static void Sensor_MessageReceived(MarsMessageTypes messageType, object message, string marsName)
+		private static void Sensor_MessageReceived(MrsMessage message, string marsName)
 		{
-			Console.WriteLine($"{messageType.ToString()} message recieved from {marsName}");
+			if (message is CommandMessage commandMessage)
+			{
+				string command = commandMessage.Command.Item.ToString();
+				Console.WriteLine($"{message.MrsMessageType} ({command}) received from {marsName}");
+			}
+			else
+			{
+				Console.WriteLine($"{message.MrsMessageType} received from {marsName}");
+			}
 		}
 
 		private static string GetLocalIPAddress()
