@@ -19,34 +19,6 @@ namespace MarsSensor
 	/// </summary>
 	public class Sensor
 	{
-		#region / / / / /  Singleton  / / / / /
-
-		/// <summary>
-		/// Singleton instance
-		/// </summary>
-		public static Sensor Instance
-		{
-			get
-			{
-				if (instance != null)
-				{
-					return instance;
-				}
-				return new Sensor();
-			}
-		}
-		private static Sensor instance;
-		private Sensor()
-		{
-			instance = this;
-			_marsClients = new Dictionary<string, MarsClient>();
-			_sensorTimer = new Timer(1000);
-			_sensorTimer.Elapsed += SensorTimer_Elapsed;
-		}
-
-		#endregion
-
-
 		#region / / / / /  Private fields  / / / / /
 
 		private ServiceHost _sensorServiceHost;
@@ -94,7 +66,7 @@ namespace MarsSensor
 		public string ServerAddress { get; private set; }
 
 		/// <summary>
-		/// Gets or sets weather the sensor will Send invalid messages
+		/// Gets or sets whether the sensor will Send invalid messages
 		/// </summary>
 		public bool ValidateMessages { get; set; } = true;
 
@@ -108,17 +80,22 @@ namespace MarsSensor
 		/// </summary>
 		public DeviceStatusReport StatusReport { get; set; }
 
+		/// <summary>
+		/// Gets or Sets whether to send status reports regardless to keep alive requests or not
+		/// </summary>
+		public bool AutoStatusReport { get; set; }
+
 		#endregion
 
 
 		#region / / / / /  Public methods  / / / / /
 
 		/// <summary>
-		/// Open sensor web service
+		/// Class Constructor
 		/// </summary>
 		/// <param name="configuration">sensor's configuration</param>
 		/// <param name="status">sensor's current FULL status report</param>
-		public void OpenWebService(DeviceConfiguration configuration, DeviceStatusReport status)
+		public Sensor(DeviceConfiguration configuration, DeviceStatusReport status)
 		{
 			if (configuration == null)
 			{
@@ -147,17 +124,26 @@ namespace MarsSensor
 			{
 				throw new ArgumentException("Invaild port! port must be higher than zero and lower than 65535", nameof(port));
 			}
-
 			DeviceConfiguration = configuration;
 			StatusReport = status ?? throw new ArgumentNullException(nameof(status));
 
-			string address = $"http://{IP}:{Port}/";
+			_marsClients = new Dictionary<string, MarsClient>();
+			_sensorTimer = new Timer(1000);
+			_sensorTimer.Elapsed += SensorTimer_Elapsed;
+		}
 
+		/// <summary>
+		/// Open sensor web service
+		/// </summary>
+		public void OpenWebService()
+		{
 			try
 			{
 				// close existing host
 				_sensorServiceHost?.Abort();
-				_sensorServiceHost = new ServiceHost(typeof(MarsService), new Uri(address));
+
+				ServiceProxy proxy = new ServiceProxy(this);
+				_sensorServiceHost = new ServiceHost(proxy, new Uri($"http://{IP}:{Port}/"));
 
 				// add detailed exception reports
 				foreach (var serviceBehavior in _sensorServiceHost.Description.Behaviors)
@@ -169,7 +155,7 @@ namespace MarsSensor
 				}
 
 				// add behavior for our MEX endpoint
-				var behavior = new ServiceMetadataBehavior()
+				var behavior = new ServiceMetadataBehavior
 				{
 					HttpGetEnabled = true
 				};
@@ -183,7 +169,7 @@ namespace MarsSensor
 				_sensorServiceHost.AddServiceEndpoint(typeof(IMetadataExchange), new BasicHttpBinding(),
 					"MEX");
 
-				ServerAddress = address + "SNSR_STD-SOAP";
+				ServerAddress = $"http://{IP}:{Port}/SNSR_STD-SOAP";
 
 				_sensorServiceHost.Open();
 				IsOpen = _sensorServiceHost.State == CommunicationState.Opened;
@@ -234,11 +220,11 @@ namespace MarsSensor
 				if (!ValidateMessages || DeviceConfiguration.IsValid(out var exception))
 				{
 					_marsClients[clientName].SoapClient.BegindoDeviceConfiguration(DeviceConfiguration, null, null);
-					MessageSent?.Invoke(MarsMessageTypes.DeviceConfiguration, DeviceConfiguration, clientName);
+					MessageSent?.Invoke(DeviceConfiguration, clientName);
 				}
 				else
 				{
-					ValidationErrorOccured?.Invoke(new InvalidMessageException(MarsMessageTypes.DeviceConfiguration, DeviceConfiguration, exception.Message));
+					ValidationErrorOccured?.Invoke(this, new InvalidMessageException(DeviceConfiguration, exception));
 				}
 			}
 		}
@@ -265,11 +251,11 @@ namespace MarsSensor
 				if (!ValidateMessages || StatusReport.IsValid(out var exception))
 				{
 					_marsClients[clientName].SoapClient.BegindoDeviceStatusReport(StatusReport, null, null);
-					MessageSent?.BeginInvoke(MarsMessageTypes.DeviceStatusReport, StatusReport, clientName, null, null);
+					MessageSent?.BeginInvoke(StatusReport, clientName, null, null);
 				}
 				else
 				{
-					ValidationErrorOccured?.Invoke(new InvalidMessageException(MarsMessageTypes.DeviceStatusReport, StatusReport, exception.Message));
+					ValidationErrorOccured?.Invoke(this, new InvalidMessageException(StatusReport, exception));
 				}
 			}
 		}
@@ -297,11 +283,11 @@ namespace MarsSensor
 				if (!ValidateMessages || emptyStatus.IsValid(out var exception))
 				{
 					_marsClients[clientName].SoapClient.BegindoDeviceStatusReport(emptyStatus, null, null);
-					MessageSent?.BeginInvoke(MarsMessageTypes.DeviceStatusReport, emptyStatus, clientName, null, null);
+					MessageSent?.BeginInvoke(emptyStatus, clientName, null, null);
 				}
 				else
 				{
-					ValidationErrorOccured?.Invoke(new InvalidMessageException(MarsMessageTypes.DeviceStatusReport, emptyStatus, exception.Message));
+					ValidationErrorOccured?.Invoke(this, new InvalidMessageException(emptyStatus, exception));
 				}
 			}
 		}
@@ -330,11 +316,11 @@ namespace MarsSensor
 				if (!ValidateMessages || emptyStatus.IsValid(out var exception))
 				{
 					_marsClients[clientName].SoapClient.BegindoDeviceStatusReport(emptyStatus, null, null);
-					MessageSent?.BeginInvoke(MarsMessageTypes.DeviceStatusReport, statusReport, clientName, null, null);
+					MessageSent?.BeginInvoke(statusReport, clientName, null, null);
 				}
 				else
 				{
-					ValidationErrorOccured?.Invoke(new InvalidMessageException(MarsMessageTypes.DeviceStatusReport, emptyStatus, exception.Message));
+					ValidationErrorOccured?.Invoke(this, new InvalidMessageException(emptyStatus, exception));
 				}
 			}
 		}
@@ -591,38 +577,6 @@ namespace MarsSensor
 			}
 		}
 
-		/// <summary>
-		/// Send indication report from a specific sensor to every mars client subscribed
-		/// </summary>
-		/// <param name="detectionTypeName">detection type</param>
-		/// <param name="sensorName">configured sensor name</param>
-		/// <param name="detections">Report's content</param>
-		public void SendIndicationReport(string detectionTypeName, string sensorName, params IndicationType[] detections)
-		{
-			if (detections.Length > 0)
-			{
-				foreach (var mars in _marsClients)
-				{
-					if (mars.Value.SubscriptionTypes != null)
-					{
-						if (mars.Value.SubscriptionTypes.Contains(SubscriptionTypeType.OperationalIndication))
-						{
-							if (detections.Length > 400)
-							{
-								detections = detections.Take(400).ToArray();
-							}
-							DeviceIndicationReport indicationReport = CreateIndicationReport(detections, sensorName, detectionTypeName);
-							if (indicationReport != null)
-							{
-								SendSingleIndicationReport(indicationReport, mars.Key);
-							}
-						}
-					}
-				}
-				_lastDetectionReceived = detections.Last();
-			}
-		}
-
 		#endregion
 
 
@@ -674,8 +628,7 @@ namespace MarsSensor
 				soapClient.Open();
 			}
 
-			MessageReceived?.BeginInvoke(MarsMessageTypes.DeviceConfiguration, request,
-				request.RequestorIdentification, null, null);
+			MessageReceived?.BeginInvoke(request, request.RequestorIdentification, null, null);
 
 			// send device config
 			SendDeviceConfig(marsName);
@@ -712,8 +665,7 @@ namespace MarsSensor
 				}
 
 				// raise the event
-				MessageReceived?.BeginInvoke(MarsMessageTypes.DeviceSubscription, request, name, 
-					null, null);
+				MessageReceived?.BeginInvoke(request, name, null, null);
 
 				// send full status report for the first time
 				SendFullDeviceStatusReport(name);
@@ -739,8 +691,7 @@ namespace MarsSensor
 				_marsClients[deviceName].LastConnectionTime = DateTime.Now;
 
 				// raise the event
-				MessageReceived?.BeginInvoke(MarsMessageTypes.CommandMessage, request, deviceName,
-					null, null);
+				MessageReceived?.BeginInvoke(request, deviceName, null, null);
 
 				// answer with empty status report
 				SendEmptyDeviceStatusReport(deviceName);
@@ -795,6 +746,11 @@ namespace MarsSensor
 					}
 				}
 			}
+
+			if (AutoStatusReport)
+			{
+				SendEmptyDeviceStatusReport();
+			}
 		}
 
 		private void SendSingleIndicationReport(DeviceIndicationReport report, string marsName)
@@ -804,11 +760,11 @@ namespace MarsSensor
 				if (!ValidateMessages || report.IsValid(out var exception))
 				{
 					_marsClients[marsName].SoapClient.BegindoDeviceIndicationReport(report, null, null);
-					MessageSent?.BeginInvoke(MarsMessageTypes.DeviceIndicationReport, report, marsName, null, null);
+					MessageSent?.BeginInvoke(report, marsName, null, null);
 				}
 				else
 				{
-					ValidationErrorOccured?.Invoke(new InvalidMessageException(MarsMessageTypes.DeviceIndicationReport, report, exception.Message));
+					ValidationErrorOccured?.Invoke(this, new InvalidMessageException(report, exception));
 				}                
 			}
 		}
@@ -825,7 +781,7 @@ namespace MarsSensor
 				Math.Cos(p1) * Math.Sin(p2) - Math.Sin(p1) * Math.Cos(p2) * Math.Cos(dl));
 		}
 
-		private DeviceIndicationReport CreateIndicationReport(IndicationType[] detections, string sensorName = null, string detectionTypeName = null)
+		private DeviceIndicationReport CreateIndicationReport(IndicationType[] detections, string sensorName = null)
 		{
 			List<IndicationType> indications = new List<IndicationType>();
 
@@ -979,16 +935,20 @@ namespace MarsSensor
 			var status = fullStatus.Copy();
 
 			// empty out status items
-			status.Items = status.Items.OfType<SensorStatusReport>().Select(x => x.Copy()).ToArray();
-			foreach (SensorStatusReport statusReport in status.Items)
+			status.Items = status.Items.Select(x => x.Copy()).ToArray();
+			foreach (var item in status.Items)
 			{
-				statusReport.Item = null;
-				statusReport.PictureStatus = null;
+				if (item is SensorStatusReport sensorStatus)
+				{
+					sensorStatus.Item = null;
+					sensorStatus.PictureStatus = null;
+				}
 			}
+
+			status.Items = status.Items.Where(x => x is SensorStatusReport || x is DetailedSensorBITType).ToArray();
 			return status;
 		}
-
-
+		
 		#endregion
 
 
@@ -1007,9 +967,8 @@ namespace MarsSensor
 		/// <summary>
 		/// Occurs after an attempt to send an invalid mars message
 		/// </summary>
-		public event ValidationErrorEventHandler ValidationErrorOccured;
-
-
+		public event EventHandler<InvalidMessageException> ValidationErrorOccured;
+		
 		#endregion
 
 
@@ -1024,19 +983,126 @@ namespace MarsSensor
 			public int Port { get; set; }
 		}
 
+		[ServiceBehavior(InstanceContextMode = InstanceContextMode.Single)]
+		private sealed class ServiceProxy : SNSR_STDSOAPPort
+		{
+			private readonly Sensor _sensor;
+			private Action _configAction;
+			private Action _subscriptionAction;
+			private Action _commnadMessageAction;
+
+			public ServiceProxy(Sensor sensor)
+			{
+				_sensor = sensor;
+			}
+
+			public IAsyncResult BegindoCommandMessage(doCommandMessageRequest request, AsyncCallback callback, object asyncState)
+			{
+				_commnadMessageAction = () =>
+				{
+					_sensor.HandleCommandMessageRequest(request.CommandMessage);
+				};
+				return _commnadMessageAction.BeginInvoke(null, null);
+			}
+
+			public IAsyncResult BegindoDeviceConfiguration(doDeviceConfigurationRequest request, AsyncCallback callback, object asyncState)
+			{
+				_configAction = () =>
+				{
+					_sensor.HandleConfigRequest(request.DeviceConfiguration);
+				};
+				return _configAction.BeginInvoke(null, null);
+			}
+
+			public IAsyncResult BegindoDeviceIndicationReport(doDeviceIndicationReportRequest request, AsyncCallback callback, object asyncState)
+			{
+				// this is for mars, not sensors
+				return null;
+			}
+
+			public IAsyncResult BegindoDeviceStatusReport(doDeviceStatusReportRequest request, AsyncCallback callback, object asyncState)
+			{
+				// this is for mars, not sensors
+				return null;
+			}
+
+			public IAsyncResult BegindoDeviceSubscriptionConfiguration(doDeviceSubscriptionConfigurationRequest request, AsyncCallback callback, object asyncState)
+			{
+				_subscriptionAction = () =>
+				{
+					_sensor.HandleSubscriptionRequest(request.DeviceSubscriptionConfiguration);
+				};
+				return _subscriptionAction.BeginInvoke(null, null);
+			}
+
+			public doCommandMessageResponse doCommandMessage(doCommandMessageRequest request)
+			{
+				_sensor.HandleCommandMessageRequest(request.CommandMessage);
+				return new doCommandMessageResponse();
+			}
+
+			public doDeviceConfigurationResponse doDeviceConfiguration(doDeviceConfigurationRequest request)
+			{
+				_sensor.HandleConfigRequest(request.DeviceConfiguration);
+				return new doDeviceConfigurationResponse();
+			}
+
+			public doCommandMessageResponse doDeviceIndicationReport(doDeviceIndicationReportRequest request)
+			{
+				// this is for mars, not sensors
+				return new doCommandMessageResponse();
+			}
+
+			public doCommandMessageResponse doDeviceStatusReport(doDeviceStatusReportRequest request)
+			{
+				// this is for mars, not sensors
+				return new doCommandMessageResponse();
+			}
+
+			public doDeviceSubscriptionConfigurationResponse doDeviceSubscriptionConfiguration(doDeviceSubscriptionConfigurationRequest request)
+			{
+				_sensor.HandleSubscriptionRequest(request.DeviceSubscriptionConfiguration);
+				return new doDeviceSubscriptionConfigurationResponse();
+			}
+
+			public doCommandMessageResponse EnddoCommandMessage(IAsyncResult result)
+			{
+				_commnadMessageAction.EndInvoke(result);
+				return new doCommandMessageResponse();
+			}
+
+			public doDeviceConfigurationResponse EnddoDeviceConfiguration(IAsyncResult result)
+			{
+				_configAction.EndInvoke(result);
+				return new doDeviceConfigurationResponse();
+			}
+
+			public doCommandMessageResponse EnddoDeviceIndicationReport(IAsyncResult result)
+			{
+				// this is for mars, not sensors
+				return new doCommandMessageResponse();
+			}
+
+			public doCommandMessageResponse EnddoDeviceStatusReport(IAsyncResult result)
+			{
+				// this is for mars, not sensors
+				return new doCommandMessageResponse();
+			}
+
+			public doDeviceSubscriptionConfigurationResponse EnddoDeviceSubscriptionConfiguration(IAsyncResult result)
+			{
+				_subscriptionAction.EndInvoke(result);
+				return new doDeviceSubscriptionConfigurationResponse();
+			}
+		}
+
 		#endregion
 	}
 
 	/// <summary>
 	/// Event Handler for any mars message events
 	/// </summary>
-	/// <param name="messageType">Message type</param>
 	/// <param name="message">the message object</param>
 	/// <param name="marsName">Name of the mars client associated with the event</param>
-	public delegate void MarsMessageEventHandler(MarsMessageTypes messageType, object message, string marsName);
-	/// <summary>
-	/// Event handler for mars validation errors
-	/// </summary>
-	/// <param name="messageException">contains details of the validation error</param>
-	public delegate void ValidationErrorEventHandler(InvalidMessageException messageException);
+	public delegate void MarsMessageEventHandler(MrsMessage message, string marsName);
 }

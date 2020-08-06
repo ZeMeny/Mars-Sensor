@@ -1,13 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
+using System.Xml.Linq;
 using System.Xml.Serialization;
+using SensorStandard;
 
-namespace MarsSensor.Extensions
+namespace MrsSensor.Core.Extensions
 {
 	internal static class ExtensionMethods
 	{
@@ -73,6 +72,25 @@ namespace MarsSensor.Extensions
 			var genericArguments = new[] { type };
 			var genericMethodInfo = methodInfo?.MakeGenericMethod(genericArguments);
 			return genericMethodInfo?.Invoke(null, new[] { o });
+		}
+
+		public static MrsMessageTypes? GetXmlType(string xml)
+		{
+			XDocument doc = XDocument.Parse(xml);
+			string rootName = doc.Root?.Name.LocalName;
+			if (Enum.TryParse(typeof(MrsMessageTypes), rootName, out var type))
+			{
+				return (MrsMessageTypes?)type;
+			}
+
+			return null;
+		}
+
+		public static T XmlConvert<T>(string xml)
+		{
+			XmlSerializer serializer = new XmlSerializer(typeof(T));
+			StringReader reader = new StringReader(xml);
+			return (T)serializer.Deserialize(reader);
 		}
 	}
 }

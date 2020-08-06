@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="3.1.6" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="3.1.6" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="4.7.0" />
+    <PackageReference Include="System.IO.Pipelines" Version="4.7.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="SensorStandard">
+      <HintPath>..\..\SensorStandard\SensorStandard\bin\Debug\SensorStandard.dll</HintPath>
+    </Reference>
+    <Reference Include="SuperSocket.Channel">
+      <HintPath>..\..\SuperSocket\src\SuperSocket.WebSocket.Server\bin\Debug\netstandard2.1\SuperSocket.Channel.dll</HintPath>
+    </Reference>
+    <Reference Include="SuperSocket.Command">
+      <HintPath>..\..\SuperSocket\src\SuperSocket.WebSocket.Server\bin\Debug\netstandard2.1\SuperSocket.Command.dll</HintPath>
+    </Reference>
+    <Reference Include="SuperSocket.Primitives">
+      <HintPath>..\..\SuperSocket\src\SuperSocket.WebSocket.Server\bin\Debug\netstandard2.1\SuperSocket.Primitives.dll</HintPath>
+    </Reference>
+    <Reference Include="SuperSocket.ProtoBase">
+      <HintPath>..\..\SuperSocket\src\SuperSocket.WebSocket.Server\bin\Debug\netstandard2.1\SuperSocket.ProtoBase.dll</HintPath>
+    </Reference>
+    <Reference Include="SuperSocket.Server">
+      <HintPath>..\..\SuperSocket\src\SuperSocket.WebSocket.Server\bin\Debug\netstandard2.1\SuperSocket.Server.dll</HintPath>
+    </Reference>
+    <Reference Include="SuperSocket.WebSocket">
+      <HintPath>..\..\SuperSocket\src\SuperSocket.WebSocket.Server\bin\Debug\netstandard2.1\SuperSocket.WebSocket.dll</HintPath>
+    </Reference>
+    <Reference Include="SuperSocket.WebSocket.Server">
+      <HintPath>..\..\SuperSocket\src\SuperSocket.WebSocket.Server\bin\Debug\netstandard2.1\SuperSocket.WebSocket.Server.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>
