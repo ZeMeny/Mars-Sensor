@@ -53,19 +53,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AltitudeReferences.cs" />
-    <Compile Include="DetectionBase.cs" />
     <Compile Include="Extensions\ExtensionMethods.cs" />
     <Compile Include="InvalidMessageException.cs" />
-    <Compile Include="Maamin\MaaminDetection.cs" />
-    <Compile Include="Maamin\Variance.cs" />
-    <Compile Include="Maamin\Velocity.cs" />
     <Compile Include="MarsService.cs" />
-    <Compile Include="RADA\RADADetection.cs" />
-    <Compile Include="RADA\RADATargetTypes.cs" />
     <Compile Include="Sensor.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Shiran\DroneDetection.cs" />
-    <Compile Include="Sigint\SigintDetection.cs" />
     <Compile Include="UnitConverter.cs" />
   </ItemGroup>
   <ItemGroup />
