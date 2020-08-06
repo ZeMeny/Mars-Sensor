@@ -16,14 +16,9 @@ namespace TestSensor
 {
 	class Program
 	{
-		private static readonly Sensor sensor = Sensor.Instance;
 
 		static void Main(string[] args)
 		{
-			sensor.ValidateMessages = true;
-			sensor.MessageReceived += Sensor_MessageReceived;
-			sensor.MessageSent += Sensor_MessageSent;
-			sensor.ValidationErrorOccured += Sensor_ValidationErrorOccured;
 
 			var serializer = new XmlSerializer(typeof(DeviceConfiguration), new XmlRootAttribute(nameof(DeviceConfiguration)));
 			var deviceConfiguration =
@@ -31,6 +26,18 @@ namespace TestSensor
 
 			serializer = new XmlSerializer(typeof(DeviceStatusReport), new XmlRootAttribute(nameof(DeviceStatusReport)));
 			var statusReport = (DeviceStatusReport) serializer.Deserialize(new StringReader(Resources.Status));
+
+			Sensor sensor = new Sensor(deviceConfiguration, statusReport) {ValidateMessages = true};
+			sensor.MessageReceived += Sensor_MessageReceived;
+			sensor.MessageSent += Sensor_MessageSent;
+			sensor.ValidationErrorOccured += Sensor_ValidationErrorOccured;
+
+			deviceConfiguration.NotificationServicePort = "13002";
+			Sensor sensor2 = new Sensor(deviceConfiguration, statusReport) {ValidateMessages = true};
+
+			sensor2.MessageReceived += Sensor2_MessageReceived;
+			sensor2.MessageSent += Sensor2_MessageSent;
+			sensor2.ValidationErrorOccured += Sensor2_ValidationErrorOccured;
 
 			//FileInfo fileInfo;
 			//ItemChoiceType3 fileType;
@@ -66,7 +73,8 @@ namespace TestSensor
 			//var pictureStatus = CreatePictureStatus(fileInfo, fileType);
 
 			Console.WriteLine("Opening sensor web service...");
-			sensor.OpenWebService(deviceConfiguration, statusReport);
+			sensor.OpenWebService();
+			sensor2.OpenWebService();
 			Console.WriteLine("Sensor web service opened on " + sensor.ServerAddress);
 			Console.WriteLine("Press Esc to Exit");
 
@@ -91,6 +99,7 @@ namespace TestSensor
 
 			Console.WriteLine("Closing web service...");
 			sensor.CloseWebService();
+			sensor2.CloseWebService();
 			Console.WriteLine("Web service closed");
 		}
 
@@ -116,6 +125,31 @@ namespace TestSensor
 			else
 			{
 				Console.WriteLine($"{message.MrsMessageType} received from {marsName}");
+			}
+		}
+
+		private static void Sensor2_ValidationErrorOccured(object sender, InvalidMessageException messageException)
+		{
+			Console.ForegroundColor = ConsoleColor.Red;
+			Console.WriteLine("Sensor2: Vaildation Error!\n" + messageException.Message);
+			Console.ResetColor();
+		}
+
+		private static void Sensor2_MessageSent(MrsMessage message, string marsName)
+		{
+			Console.WriteLine($"Sensor2: {message.MrsMessageType} message sent to {marsName}");
+		}
+
+		private static void Sensor2_MessageReceived(MrsMessage message, string marsName)
+		{
+			if (message is CommandMessage commandMessage)
+			{
+				string command = commandMessage.Command.Item.ToString();
+				Console.WriteLine($"Sensor2: {message.MrsMessageType} ({command}) received from {marsName}");
+			}
+			else
+			{
+				Console.WriteLine($"Sensor2: {message.MrsMessageType} received from {marsName}");
 			}
 		}
 
