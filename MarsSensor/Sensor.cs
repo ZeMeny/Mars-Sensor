@@ -19,34 +19,6 @@ namespace MarsSensor
 	/// </summary>
 	public class Sensor
 	{
-		#region / / / / /  Singleton  / / / / /
-
-		/// <summary>
-		/// Singleton instance
-		/// </summary>
-		public static Sensor Instance
-		{
-			get
-			{
-				if (instance != null)
-				{
-					return instance;
-				}
-				return new Sensor();
-			}
-		}
-		private static Sensor instance;
-		private Sensor()
-		{
-			instance = this;
-			_marsClients = new Dictionary<string, MarsClient>();
-			_sensorTimer = new Timer(1000);
-			_sensorTimer.Elapsed += SensorTimer_Elapsed;
-		}
-
-		#endregion
-
-
 		#region / / / / /  Private fields  / / / / /
 
 		private ServiceHost _sensorServiceHost;
@@ -119,11 +91,11 @@ namespace MarsSensor
 		#region / / / / /  Public methods  / / / / /
 
 		/// <summary>
-		/// Open sensor web service
+		/// Class Constructor
 		/// </summary>
 		/// <param name="configuration">sensor's configuration</param>
 		/// <param name="status">sensor's current FULL status report</param>
-		public void OpenWebService(DeviceConfiguration configuration, DeviceStatusReport status)
+		public Sensor(DeviceConfiguration configuration, DeviceStatusReport status)
 		{
 			if (configuration == null)
 			{
@@ -152,17 +124,26 @@ namespace MarsSensor
 			{
 				throw new ArgumentException("Invaild port! port must be higher than zero and lower than 65535", nameof(port));
 			}
-
 			DeviceConfiguration = configuration;
 			StatusReport = status ?? throw new ArgumentNullException(nameof(status));
 
-			string address = $"http://{IP}:{Port}/";
+			_marsClients = new Dictionary<string, MarsClient>();
+			_sensorTimer = new Timer(1000);
+			_sensorTimer.Elapsed += SensorTimer_Elapsed;
+		}
 
+		/// <summary>
+		/// Open sensor web service
+		/// </summary>
+		public void OpenWebService()
+		{
 			try
 			{
 				// close existing host
 				_sensorServiceHost?.Abort();
-				_sensorServiceHost = new ServiceHost(typeof(MarsService), new Uri(address));
+
+				ServiceProxy proxy = new ServiceProxy(this);
+				_sensorServiceHost = new ServiceHost(proxy, new Uri($"http://{IP}:{Port}/"));
 
 				// add detailed exception reports
 				foreach (var serviceBehavior in _sensorServiceHost.Description.Behaviors)
@@ -174,7 +155,7 @@ namespace MarsSensor
 				}
 
 				// add behavior for our MEX endpoint
-				var behavior = new ServiceMetadataBehavior()
+				var behavior = new ServiceMetadataBehavior
 				{
 					HttpGetEnabled = true
 				};
@@ -188,7 +169,7 @@ namespace MarsSensor
 				_sensorServiceHost.AddServiceEndpoint(typeof(IMetadataExchange), new BasicHttpBinding(),
 					"MEX");
 
-				ServerAddress = address + "SNSR_STD-SOAP";
+				ServerAddress = $"http://{IP}:{Port}/SNSR_STD-SOAP";
 
 				_sensorServiceHost.Open();
 				IsOpen = _sensorServiceHost.State == CommunicationState.Opened;
@@ -954,16 +935,20 @@ namespace MarsSensor
 			var status = fullStatus.Copy();
 
 			// empty out status items
-			status.Items = status.Items.OfType<SensorStatusReport>().Select(x => x.Copy()).ToArray();
-			foreach (SensorStatusReport statusReport in status.Items)
+			status.Items = status.Items.Select(x => x.Copy()).ToArray();
+			foreach (var item in status.Items)
 			{
-				statusReport.Item = null;
-				statusReport.PictureStatus = null;
+				if (item is SensorStatusReport sensorStatus)
+				{
+					sensorStatus.Item = null;
+					sensorStatus.PictureStatus = null;
+				}
 			}
+
+			status.Items = status.Items.Where(x => x is SensorStatusReport || x is DetailedSensorBITType).ToArray();
 			return status;
 		}
-
-
+		
 		#endregion
 
 
@@ -983,8 +968,7 @@ namespace MarsSensor
 		/// Occurs after an attempt to send an invalid mars message
 		/// </summary>
 		public event EventHandler<InvalidMessageException> ValidationErrorOccured;
-
-
+		
 		#endregion
 
 
@@ -997,6 +981,119 @@ namespace MarsSensor
 			public DateTime LastConnectionTime { get; set; }
 			public string IP { get; set; }
 			public int Port { get; set; }
+		}
+
+		[ServiceBehavior(InstanceContextMode = InstanceContextMode.Single)]
+		private sealed class ServiceProxy : SNSR_STDSOAPPort
+		{
+			private readonly Sensor _sensor;
+			private Action _configAction;
+			private Action _subscriptionAction;
+			private Action _commnadMessageAction;
+
+			public ServiceProxy(Sensor sensor)
+			{
+				_sensor = sensor;
+			}
+
+			public IAsyncResult BegindoCommandMessage(doCommandMessageRequest request, AsyncCallback callback, object asyncState)
+			{
+				_commnadMessageAction = () =>
+				{
+					_sensor.HandleCommandMessageRequest(request.CommandMessage);
+				};
+				return _commnadMessageAction.BeginInvoke(null, null);
+			}
+
+			public IAsyncResult BegindoDeviceConfiguration(doDeviceConfigurationRequest request, AsyncCallback callback, object asyncState)
+			{
+				_configAction = () =>
+				{
+					_sensor.HandleConfigRequest(request.DeviceConfiguration);
+				};
+				return _configAction.BeginInvoke(null, null);
+			}
+
+			public IAsyncResult BegindoDeviceIndicationReport(doDeviceIndicationReportRequest request, AsyncCallback callback, object asyncState)
+			{
+				// this is for mars, not sensors
+				return null;
+			}
+
+			public IAsyncResult BegindoDeviceStatusReport(doDeviceStatusReportRequest request, AsyncCallback callback, object asyncState)
+			{
+				// this is for mars, not sensors
+				return null;
+			}
+
+			public IAsyncResult BegindoDeviceSubscriptionConfiguration(doDeviceSubscriptionConfigurationRequest request, AsyncCallback callback, object asyncState)
+			{
+				_subscriptionAction = () =>
+				{
+					_sensor.HandleSubscriptionRequest(request.DeviceSubscriptionConfiguration);
+				};
+				return _subscriptionAction.BeginInvoke(null, null);
+			}
+
+			public doCommandMessageResponse doCommandMessage(doCommandMessageRequest request)
+			{
+				_sensor.HandleCommandMessageRequest(request.CommandMessage);
+				return new doCommandMessageResponse();
+			}
+
+			public doDeviceConfigurationResponse doDeviceConfiguration(doDeviceConfigurationRequest request)
+			{
+				_sensor.HandleConfigRequest(request.DeviceConfiguration);
+				return new doDeviceConfigurationResponse();
+			}
+
+			public doCommandMessageResponse doDeviceIndicationReport(doDeviceIndicationReportRequest request)
+			{
+				// this is for mars, not sensors
+				return new doCommandMessageResponse();
+			}
+
+			public doCommandMessageResponse doDeviceStatusReport(doDeviceStatusReportRequest request)
+			{
+				// this is for mars, not sensors
+				return new doCommandMessageResponse();
+			}
+
+			public doDeviceSubscriptionConfigurationResponse doDeviceSubscriptionConfiguration(doDeviceSubscriptionConfigurationRequest request)
+			{
+				_sensor.HandleSubscriptionRequest(request.DeviceSubscriptionConfiguration);
+				return new doDeviceSubscriptionConfigurationResponse();
+			}
+
+			public doCommandMessageResponse EnddoCommandMessage(IAsyncResult result)
+			{
+				_commnadMessageAction.EndInvoke(result);
+				return new doCommandMessageResponse();
+			}
+
+			public doDeviceConfigurationResponse EnddoDeviceConfiguration(IAsyncResult result)
+			{
+				_configAction.EndInvoke(result);
+				return new doDeviceConfigurationResponse();
+			}
+
+			public doCommandMessageResponse EnddoDeviceIndicationReport(IAsyncResult result)
+			{
+				// this is for mars, not sensors
+				return new doCommandMessageResponse();
+			}
+
+			public doCommandMessageResponse EnddoDeviceStatusReport(IAsyncResult result)
+			{
+				// this is for mars, not sensors
+				return new doCommandMessageResponse();
+			}
+
+			public doDeviceSubscriptionConfigurationResponse EnddoDeviceSubscriptionConfiguration(IAsyncResult result)
+			{
+				_subscriptionAction.EndInvoke(result);
+				return new doDeviceSubscriptionConfigurationResponse();
+			}
 		}
 
 		#endregion
