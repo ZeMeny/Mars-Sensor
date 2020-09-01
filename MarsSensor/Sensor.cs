@@ -6,6 +6,7 @@ using System.ServiceModel.Description;
 using System.ServiceModel.Security;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Timers;
 using MarsSensor.Extensions;
 using SensorStandard;
@@ -15,7 +16,7 @@ using SensorIdentificationType = SensorStandard.MrsTypes.SensorIdentificationTyp
 namespace MarsSensor
 {
 	/// <summary>
-	/// Generic class for mars sensors
+	/// Class for Generic Mars Sensors
 	/// </summary>
 	public class Sensor
 	{
@@ -140,7 +141,7 @@ namespace MarsSensor
 			try
 			{
 				// close existing host
-				_sensorServiceHost?.Abort();
+				CloseWebService();
 
 				ServiceProxy proxy = new ServiceProxy(this);
 				_sensorServiceHost = new ServiceHost(proxy, new Uri($"http://{IP}:{Port}/"));
@@ -191,7 +192,7 @@ namespace MarsSensor
 			if (_sensorServiceHost != null)
 			{
 				// close the server
-				_sensorServiceHost.Close();
+				_sensorServiceHost.Abort();
 				IsOpen = false;
 			}
 
@@ -200,7 +201,7 @@ namespace MarsSensor
 				// close all clients
 				foreach (var client in _marsClients.Values)
 				{
-					client.SoapClient.Close();
+					client.SoapClient.Abort();
 				}
 				_marsClients.Clear(); 
 			}
@@ -672,7 +673,7 @@ namespace MarsSensor
 			}
 			else
 			{
-				Console.WriteLine("Unknown Mars name");
+				Console.WriteLine($"Unknown Mars name ({name})");
 			}
 		}
 
@@ -698,7 +699,7 @@ namespace MarsSensor
 			}
 			else
 			{
-				Console.WriteLine("Unknown mars name");
+				Console.WriteLine($"Unknown mars name ({deviceName})");
 			}
 		}
 
@@ -938,6 +939,10 @@ namespace MarsSensor
 			status.Items = status.Items.Select(x => x.Copy()).ToArray();
 			foreach (var item in status.Items)
 			{
+                if (item is DeviceStatusReport deviceStatus)
+                {
+					GetEmptyStatus(deviceStatus);
+                }
 				if (item is SensorStatusReport sensorStatus)
 				{
 					sensorStatus.Item = null;
@@ -945,7 +950,7 @@ namespace MarsSensor
 				}
 			}
 
-			status.Items = status.Items.Where(x => x is SensorStatusReport || x is DetailedSensorBITType).ToArray();
+			//status.Items = status.Items.Where(x => x is SensorStatusReport || x is DetailedSensorBITType).ToArray();
 			return status;
 		}
 		
@@ -987,9 +992,6 @@ namespace MarsSensor
 		private sealed class ServiceProxy : SNSR_STDSOAPPort
 		{
 			private readonly Sensor _sensor;
-			private Action _configAction;
-			private Action _subscriptionAction;
-			private Action _commnadMessageAction;
 
 			public ServiceProxy(Sensor sensor)
 			{
@@ -998,20 +1000,12 @@ namespace MarsSensor
 
 			public IAsyncResult BegindoCommandMessage(doCommandMessageRequest request, AsyncCallback callback, object asyncState)
 			{
-				_commnadMessageAction = () =>
-				{
-					_sensor.HandleCommandMessageRequest(request.CommandMessage);
-				};
-				return _commnadMessageAction.BeginInvoke(null, null);
+				return Task.Run(() => _sensor.HandleCommandMessageRequest(request.CommandMessage));
 			}
 
 			public IAsyncResult BegindoDeviceConfiguration(doDeviceConfigurationRequest request, AsyncCallback callback, object asyncState)
 			{
-				_configAction = () =>
-				{
-					_sensor.HandleConfigRequest(request.DeviceConfiguration);
-				};
-				return _configAction.BeginInvoke(null, null);
+				return Task.Run(() => _sensor.HandleConfigRequest(request.DeviceConfiguration));
 			}
 
 			public IAsyncResult BegindoDeviceIndicationReport(doDeviceIndicationReportRequest request, AsyncCallback callback, object asyncState)
@@ -1028,11 +1022,7 @@ namespace MarsSensor
 
 			public IAsyncResult BegindoDeviceSubscriptionConfiguration(doDeviceSubscriptionConfigurationRequest request, AsyncCallback callback, object asyncState)
 			{
-				_subscriptionAction = () =>
-				{
-					_sensor.HandleSubscriptionRequest(request.DeviceSubscriptionConfiguration);
-				};
-				return _subscriptionAction.BeginInvoke(null, null);
+				return Task.Run(() => _sensor.HandleSubscriptionRequest(request.DeviceSubscriptionConfiguration));
 			}
 
 			public doCommandMessageResponse doCommandMessage(doCommandMessageRequest request)
@@ -1067,13 +1057,11 @@ namespace MarsSensor
 
 			public doCommandMessageResponse EnddoCommandMessage(IAsyncResult result)
 			{
-				_commnadMessageAction.EndInvoke(result);
 				return new doCommandMessageResponse();
 			}
 
 			public doDeviceConfigurationResponse EnddoDeviceConfiguration(IAsyncResult result)
 			{
-				_configAction.EndInvoke(result);
 				return new doDeviceConfigurationResponse();
 			}
 
@@ -1091,7 +1079,6 @@ namespace MarsSensor
 
 			public doDeviceSubscriptionConfigurationResponse EnddoDeviceSubscriptionConfiguration(IAsyncResult result)
 			{
-				_subscriptionAction.EndInvoke(result);
 				return new doDeviceSubscriptionConfigurationResponse();
 			}
 		}

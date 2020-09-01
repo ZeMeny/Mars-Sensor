@@ -27,69 +27,16 @@ namespace TestSensor
 			serializer = new XmlSerializer(typeof(DeviceStatusReport), new XmlRootAttribute(nameof(DeviceStatusReport)));
 			var statusReport = (DeviceStatusReport) serializer.Deserialize(new StringReader(Resources.Status));
 
-			Sensor sensor = new Sensor(deviceConfiguration, statusReport) {ValidateMessages = true};
+			Sensor sensor = new Sensor(deviceConfiguration, statusReport);
 			sensor.MessageReceived += Sensor_MessageReceived;
 			sensor.MessageSent += Sensor_MessageSent;
 			sensor.ValidationErrorOccured += Sensor_ValidationErrorOccured;
-
-			deviceConfiguration.NotificationServicePort = "13002";
-			Sensor sensor2 = new Sensor(deviceConfiguration, statusReport) {ValidateMessages = true};
-
-			sensor2.MessageReceived += Sensor2_MessageReceived;
-			sensor2.MessageSent += Sensor2_MessageSent;
-			sensor2.ValidationErrorOccured += Sensor2_ValidationErrorOccured;
-
-			//FileInfo fileInfo;
-			//ItemChoiceType3 fileType;
-
-			//while (true)
-			//{
-			//	Console.WriteLine("Video or image? (v/i)");
-			//	var key =  Console.ReadLine();
-			//	if (key?.ToLower() == "i")
-			//	{
-			//		fileInfo = new FileInfo(@"D:\Development\קוד סימולטור\חדש\17977960.jpg");
-			//		fileType = ItemChoiceType3.NameJPEG;
-			//		if (fileInfo.Exists)
-			//		{
-			//			Console.WriteLine("Image loaded successfully");
-			//		}
-			//		break;
-			//	}
-			//	if (key?.ToLower() == "v")
-			//	{
-			//		fileInfo = new FileInfo(@"D:\Development\קוד סימולטור\חדש\486360.mp4");
-			//		fileType = ItemChoiceType3.NameMP4;
-			//		if (fileInfo.Exists)
-			//		{
-			//			Console.WriteLine("Video loaded successfully");
-			//		}
-			//		break;
-			//	}
-
-			//	Console.WriteLine("Invalid input, try again.");
-			//}
-
-			//var pictureStatus = CreatePictureStatus(fileInfo, fileType);
+			sensor.ValidateMessages = true;
 
 			Console.WriteLine("Opening sensor web service...");
 			sensor.OpenWebService();
-			sensor2.OpenWebService();
 			Console.WriteLine("Sensor web service opened on " + sensor.ServerAddress);
 			Console.WriteLine("Press Esc to Exit");
-
-			//var opticalStatus = statusReport.Items.OfType<SensorStatusReport>()
-			//	.FirstOrDefault(x => x.Item is OpticalStatus);
-			//if (opticalStatus != null)
-			//{
-			//	opticalStatus.PictureStatus = pictureStatus;
-			//}
-			//else
-			//{
-			//	Console.ForegroundColor = ConsoleColor.Red;
-			//	Console.WriteLine("No optical status found");
-			//	Console.ResetColor();
-			//}
 
 			while (Console.ReadKey(true).Key != ConsoleKey.Escape)
 			{
@@ -99,7 +46,6 @@ namespace TestSensor
 
 			Console.WriteLine("Closing web service...");
 			sensor.CloseWebService();
-			sensor2.CloseWebService();
 			Console.WriteLine("Web service closed");
 		}
 
@@ -128,31 +74,6 @@ namespace TestSensor
 			}
 		}
 
-		private static void Sensor2_ValidationErrorOccured(object sender, InvalidMessageException messageException)
-		{
-			Console.ForegroundColor = ConsoleColor.Red;
-			Console.WriteLine("Sensor2: Vaildation Error!\n" + messageException.Message);
-			Console.ResetColor();
-		}
-
-		private static void Sensor2_MessageSent(MrsMessage message, string marsName)
-		{
-			Console.WriteLine($"Sensor2: {message.MrsMessageType} message sent to {marsName}");
-		}
-
-		private static void Sensor2_MessageReceived(MrsMessage message, string marsName)
-		{
-			if (message is CommandMessage commandMessage)
-			{
-				string command = commandMessage.Command.Item.ToString();
-				Console.WriteLine($"Sensor2: {message.MrsMessageType} ({command}) received from {marsName}");
-			}
-			else
-			{
-				Console.WriteLine($"Sensor2: {message.MrsMessageType} received from {marsName}");
-			}
-		}
-
 		private static string GetLocalIPAddress()
 		{
 			var host = Dns.GetHostEntry(Dns.GetHostName());
@@ -167,23 +88,22 @@ namespace TestSensor
 			return string.Empty;
 		}
 
-		private static PictureStatus CreatePictureStatus(FileInfo fileInfo, ItemChoiceType3 fileType)
+		private static PictureStatus CreatePictureStatus(FileInfo fileInfo)
 		{
 			return new PictureStatus
 			{
 				PictureState = PictureState.PicturesAttached,
 				MediaFile = new[]
 				{
-					new SensorStandard.MrsTypes.File
+					new ImageFile
 					{
 						CreationTime = new TimeType
 						{
 							Zone = TimezoneType.GMT,
 							Value = fileInfo.CreationTime
 						},
-						ItemElementName = fileType,
 						Item = fileInfo.Name,
-						File1 = File.ReadAllBytes(fileInfo.FullName)
+						File = File.ReadAllBytes(fileInfo.FullName)
 					}
 				}
 			};
